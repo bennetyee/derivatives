@@ -191,8 +191,9 @@ def Main(argv):
     parser.add_argument('--num-segments', '-n', type=int, default=100,
                         help='number of line segments used in graphing functions') 
     global options
-    options = parser.parse_args(argv[1:])
-    app = QtWidgets.QApplication([])
+    options, extra = parser.parse_known_args(argv[1:])
+    qtargv = [argv[0]] + extra
+    app = QtWidgets.QApplication(qtargv)  # allow for --style, --reverse etc
     fname = options.function_name
     if fname == '':
         fname = options.function
