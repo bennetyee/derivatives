@@ -48,14 +48,20 @@ class MainWindow(QtWidgets.QMainWindow):
         assert xmin < xmax
         super(MainWindow, self).__init__(*args, **kwargs)
 
+        self.deltax_format = '𝝙x = %11.4g'
+        self.x_format = ' x = %11.4g'
+
         self.slider_width = 1000
-        self.slider_scale = (xmax - xmin) / float(self.slider_width)
+        self.deltax_scale = (xmax - xmin) / float(self.slider_width)
         self.deltax = (xmax - xmin) / num_segs
         self.min_deltax = (xmax - xmin) / 1.e6
-        xslider = self.slider_width / 2  # XSlot that yields self.x
+        deltax_initial_slider_value = self.deltax // self.deltax_scale
+
         self.x = (xmin + xmax) / 2
         self.xbase = xmin
         self.xscale = (xmax - xmin) / self.slider_width
+        x_initial_slider_value = self.slider_width // 2
+
         self.f = f
 
         def fprime(x):
@@ -73,28 +79,24 @@ class MainWindow(QtWidgets.QMainWindow):
         # self.derivative_canvas = FuncCanvas(balanced_fprime, "derivative", xmin, xmax, num_segs, width=5, height=4, dpi=300)
         # self.show_x = self.show_x_balanced  # balanced_fprime
 
-        self.main_func_canvas.Update(self.show_x)
-        # self.derivative_canvas.Update() Done at DeltaXSlot
-
         layout = QtWidgets.QVBoxLayout()
         # layout.addWidget(toolbar)
         layout.addWidget(self.main_func_canvas)
         layout.addWidget(self.derivative_canvas)
 
-        slider = QtWidgets.QSlider()
+        slider = QtWidgets.QSlider() # deltax value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setValue(40)
-        slider.setMinimum(0)
-        slider.setMaximum(self.slider_width)
+        slider.setRange(0, self.slider_width)
+        slider.setValue(deltax_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
         slider.valueChanged.connect(self.DeltaXSlot)
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
-        self.slider_value = QtWidgets.QLabel('𝝙x')
+        self.slider_value = QtWidgets.QLabel()
         font = self.slider_value.font()
-        br = QtGui.QFontMetrics(font).boundingRect('𝝙x = -8.8888e-88')
+        br = QtGui.QFontMetrics(font).boundingRect(self.deltax_format % -8.8888e-88)
         self.slider_value.setMinimumSize(br.width(), br.height())
         # use same for x slider
         sliderLayout.addWidget(self.slider_value)
@@ -105,23 +107,22 @@ class MainWindow(QtWidgets.QMainWindow):
 
         slider = QtWidgets.QSlider()  # x value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setValue(xslider)
-        slider.setMinimum(0)
-        slider.setMaximum(self.slider_width)
+        slider.setRange(0, self.slider_width)
+        slider.setValue(x_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
         slider.valueChanged.connect(self.XSlot)
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
-        self.slider_xvalue = QtWidgets.QLabel('x')
+        self.slider_xvalue = QtWidgets.QLabel()
         self.slider_xvalue.setMinimumSize(br.width(), br.height())
         sliderLayout.addWidget(self.slider_xvalue)
         sliderLayout.addWidget(slider)
         layout.addLayout(sliderLayout)
 
-        self.DeltaXSlot(40)
-        self.XSlot(xslider)
+        self.DeltaXSlot(deltax_initial_slider_value)
+        self.XSlot(x_initial_slider_value)
 
         # Create a placeholder widget to hold our toolbar and canvas.
         widget = QtWidgets.QWidget()
@@ -151,7 +152,7 @@ class MainWindow(QtWidgets.QMainWindow):
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
     def DeltaXSlot(self, value):
-        self.deltax = self.slider_scale * value
+        self.deltax = self.deltax_scale * value
         if abs(self.deltax) < self.min_deltax:
             self.deltax = self.min_deltax
         self.UpdateDerivativeCanvas()
@@ -161,7 +162,8 @@ class MainWindow(QtWidgets.QMainWindow):
     def UpdateDerivativeCanvas(self):
         self.derivative_canvas.Update()
         # should set a fixed width font and set width
-        self.slider_value.setText('𝝙x = %11.4g' % self.deltax)
+        self.slider_value.setText(self.deltax_format % self.deltax)
+
     def XSlot(self, value):
         self.x = self.xbase + value * self.xscale
         self.UpdateMainCanvas()
@@ -170,7 +172,7 @@ class MainWindow(QtWidgets.QMainWindow):
     def UpdateMainCanvas(self):
         self.main_func_canvas.Update(self.show_x)
         # should set a fixed width font and set width
-        self.slider_xvalue.setText('x = %11.4g' % self.x)
+        self.slider_xvalue.setText(self.x_format % self.x)
 
 def Main(argv):
     app = QtWidgets.QApplication(argv)
