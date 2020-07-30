@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 
+import argparse
 import math
 import sys
 import matplotlib
@@ -12,6 +13,7 @@ from matplotlib.figure import Figure
 
 INITIAL_WIDTH = 1000
 INITIAL_HEIGHT = 800
+options = None
 
 class FuncCanvas(FigureCanvasQTAgg):
     def __init__(self, func, title, xmin, xmax, num_segs, width=5, height=4, dpi=300):
@@ -175,9 +177,27 @@ class MainWindow(QtWidgets.QMainWindow):
         self.slider_xvalue.setText(self.x_format % self.x)
 
 def Main(argv):
-    app = QtWidgets.QApplication(argv)
-    w = MainWindow(math.sin, "sin(x)", -2.0 * math.pi, 2.0 * math.pi, 100)
-#    w = MainWindow(lambda x: x*x, "y=x*x", -2.0 * math.pi, 2.0 * math.pi, 100)
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--debug', '-d', action='store_true',
+                        help='generate debugging output')
+    parser.add_argument('--function', '-f', type=str, default='math.sin',
+                        help='function to plot')
+    parser.add_argument('--function-name', '-F', type=str, default='',
+                        help='name of function to use in plot title')
+    parser.add_argument('--min-x', '-m', type=float, default=-2.0 * math.pi,
+                        help='mininum x value to use in plot')
+    parser.add_argument('--max-x', '-M', type=float, default= 2.0 * math.pi,
+                        help='maximum x value to use in plot')
+    parser.add_argument('--num-segments', '-n', type=int, default=100,
+                        help='number of line segments used in graphing functions') 
+    global options
+    options = parser.parse_args(argv[1:])
+    app = QtWidgets.QApplication([])
+    fname = options.function_name
+    if fname == '':
+        fname = options.function
+    w = MainWindow(eval(options.function), fname, options.min_x,
+                   options.max_x, options.num_segments)
     app.exec_()
 
 if __name__ == '__main__':
