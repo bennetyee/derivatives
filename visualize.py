@@ -15,32 +15,83 @@ INITIAL_WIDTH = 1000
 INITIAL_HEIGHT = 800
 options = None
 
+WIDER=True
+
+class PrecomputedFunc:
+    def __init__(self, f, x0, x1, num_segs):
+        super(PrecomputedFunc, self).__init__()
+        self._func = f
+        self._x0 = x0
+        self._x1 = x1
+        self._num_segs = num_segs
+        self._dx = (self._x1 - self._x0) / self._num_segs
+        if WIDER:
+            # to maintain display fidelity and to allow larger Δx values,
+            # we widen the precomputation region
+            width = x1 - x0
+            self._x0 = x0 - width
+            self._x1 = x1 + width
+            self._num_segs = 3 * num_segs
+        self._prex = []
+        self._prey = []
+        self.UpdatePrecomputes()
+
+    def UpdatePrecomputes(self):
+        prex = []
+        prey = []
+        dx = self._dx
+        x0 = self._x0
+        f = self._func
+        for i in range(self._num_segs + 1):
+            x = x0 + i * dx
+            y = f(x)
+            prex.append(x)
+            prey.append(y)
+        self._prex = prex
+        self._prey = prey
+
+    def f(self, x):
+        if x < self._x0 or self._x1 < x:
+            # derivative computation may require evaluation from
+            # outside the precomputation range
+            return self._func(x)
+        lower = int((x - self._x0) // self._dx)
+        lower_x = self._x0 + lower * self._dx
+        if x - lower_x <= self._dx / 2:
+            ix = lower
+        else:
+            ix = lower + 1
+        return self._prey[ix]
+
+        
 class FuncCanvas(FigureCanvasQTAgg):
     def __init__(self, func, title, xmin, xmax, num_segs, width=5, height=4, dpi=300):
-        self.fig = Figure(figsize=(width, height), dpi=dpi)
-        super(FuncCanvas, self).__init__(self.fig)
-        self.func = func
-        self.title = title
-        self.xmin = xmin
-        self.xmax = xmax
-        self.num_segs = num_segs
+        self._fig = Figure(figsize=(width, height), dpi=dpi)
+        super(FuncCanvas, self).__init__(self._fig)
+        self._func = func
+        self._title = title
+        self._xmin = xmin
+        self._xmax = xmax
+        self._num_segs = num_segs
 
     def Update(self, extra=None):
-        dx = (self.xmax - self.xmin) / self.num_segs
+        if options.debug:
+            print("Update(self=%s" % self)
+        dx = (self._xmax - self._xmin) / self._num_segs
         xs = []
         ys = []
-        for i in range(self.num_segs + 1):
-            x = self.xmin + i *  dx
-            y = self.func(x)
+        for i in range(self._num_segs + 1):
+            x = self._xmin + i *  dx
+            y = self._func.f(x)
             xs.append(x)
             ys.append(y)
-        self.fig.clf()
-        self.axes = self.fig.add_subplot(111)
-        self.axes.set_title(self.title)
-        self.axes.plot(xs, ys)
+        self._fig.clf()
+        self._axes = self._fig.add_subplot(111)
+        self._axes.set_title(self._title)
+        self._axes.plot(xs, ys)
         if extra is not None:
-            extra(self.axes)
-        self.axes.grid()
+            extra(self._axes, self._func)
+        self._axes.grid()
         self.draw()
 
 
@@ -50,45 +101,87 @@ class MainWindow(QtWidgets.QMainWindow):
         assert xmin < xmax
         super(MainWindow, self).__init__(*args, **kwargs)
 
-        self.deltax_format = '𝝙x = %11.4g'
-        self.x_format = ' x = %11.4g'
+        self._deltax_format = '𝝙x = %11.4g'
+        self._x_format = ' x = %11.4g'
 
-        self.slider_width = 1000
-        self.deltax_scale = (xmax - xmin) / float(self.slider_width)
-        self.deltax = (xmax - xmin) / num_segs
-        self.min_deltax = (xmax - xmin) / 1.e6
-        deltax_initial_slider_value = self.deltax // self.deltax_scale
+        self._slider_width = 1000
+        self._deltax_scale = (xmax - xmin) / float(self._slider_width)
+        self._deltax = (xmax - xmin) / num_segs
+        self._min_deltax = (xmax - xmin) / 1.e6
+        deltax_initial_slider_value = self._deltax // self._deltax_scale
 
-        self.x = (xmin + xmax) / 2
-        self.xbase = xmin
-        self.xscale = (xmax - xmin) / self.slider_width
-        x_initial_slider_value = self.slider_width // 2
+        self._x = (xmin + xmax) / 2
+        self._xbase = xmin
+        self._xscale = (xmax - xmin) / self._slider_width
+        x_initial_slider_value = self._slider_width // 2
 
-        self.f = f
+        self._update_x = []
+        self._update_deltax = []
 
-        def fprime(x):
-            return (f(x + self.deltax) - f(x)) / self.deltax
+        self._f = f
 
-        def balanced_fprime(x):
-            half = self.deltax / 2.0
-            return (f(x + half) - f(x - half)) / self.deltax
+        def derivative_plus(f):
+            def fprime(x):
+                return (f(x + self._deltax) - f(x)) / self._deltax
+            return fprime
 
-        self.main_func_canvas = FuncCanvas(f, fname, xmin, xmax, num_segs, width=5, height=4, dpi=300)
-        self.derivative_canvas = FuncCanvas(fprime, "derivative", xmin, xmax, num_segs, width=5, height=4, dpi=300)
+        def derivative_minus(f):
+            def fprime(x):
+                return (f(x) - f(x - self._deltax)) / self._deltax
+            return fprime
 
-        self.show_x = self.show_x_and_deltax  # fprime
+        def derivative_balanced(f):
+            def fprime(x):
+                half = self._deltax / 2.0
+                return (f(x + half) - f(x - half)) / self._deltax
+            return fprime
 
-        # self.derivative_canvas = FuncCanvas(balanced_fprime, "derivative", xmin, xmax, num_segs, width=5, height=4, dpi=300)
-        # self.show_x = self.show_x_balanced  # balanced_fprime
+        deriv = derivative_plus
+        show_x = self.ShowXPlusDeltaX  # derivative_plus
 
         layout = QtWidgets.QVBoxLayout()
-        # layout.addWidget(toolbar)
-        layout.addWidget(self.main_func_canvas)
-        layout.addWidget(self.derivative_canvas)
+
+        fobj = PrecomputedFunc(f, xmin, xmax, num_segs)
+        prev_canvas = FuncCanvas(fobj, 'f = ' + fname, xmin, xmax, num_segs, width=5, height=4, dpi=300)
+        if options.debug:
+            print("prev_canvas: %s" % prev_canvas)
+
+        layout.addWidget(prev_canvas)
+
+        nextf = f
+        title = "f"
+
+        for _ in range(options.differentiate):
+            nextf = deriv(nextf)
+            title = title + "'"
+            fobj = PrecomputedFunc(nextf, xmin, xmax, num_segs)
+
+            new_canvas = FuncCanvas(fobj, title, xmin, xmax, num_segs, width=5, height=4, dpi=300)
+            layout.addWidget(new_canvas)
+            if options.debug:
+                print("new_canvas: %s" % new_canvas)
+
+            # need to capture current value of prev_canvas, rather than
+            # let it lambda bind to the variable which will change later.
+            def ShowXAndDeltaXUpdater(canvas):
+                def Updater():
+                    canvas.Update(show_x)
+                return Updater
+            def ShowXUpdater(canvas):
+                def Updater():
+                    canvas.Update(self.ShowJustX)
+                return Updater
+            self._update_x.append(ShowXAndDeltaXUpdater(prev_canvas))
+            self._update_deltax.append(ShowXAndDeltaXUpdater(prev_canvas))
+            self._update_deltax.append(fobj.UpdatePrecomputes)
+
+            prev_canvas = new_canvas
+        self._update_x.append(ShowXUpdater(new_canvas))
+        self._update_deltax.append(ShowXUpdater(new_canvas))
 
         slider = QtWidgets.QSlider() # deltax value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setRange(0, self.slider_width)
+        slider.setRange(0, self._slider_width)
         slider.setValue(deltax_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
@@ -96,12 +189,12 @@ class MainWindow(QtWidgets.QMainWindow):
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
-        self.slider_value = QtWidgets.QLabel()
-        font = self.slider_value.font()
-        br = QtGui.QFontMetrics(font).boundingRect(self.deltax_format % -8.8888e-88)
-        self.slider_value.setMinimumSize(br.width(), br.height())
+        self._slider_value = QtWidgets.QLabel()
+        font = self._slider_value.font()
+        br = QtGui.QFontMetrics(font).boundingRect(self._deltax_format % -8.8888e-88)
+        self._slider_value.setMinimumSize(br.width(), br.height())
         # use same for x slider
-        sliderLayout.addWidget(self.slider_value)
+        sliderLayout.addWidget(self._slider_value)
         sliderLayout.addWidget(slider)
 
         layout.addStretch(1)
@@ -109,7 +202,7 @@ class MainWindow(QtWidgets.QMainWindow):
 
         slider = QtWidgets.QSlider()  # x value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
-        slider.setRange(0, self.slider_width)
+        slider.setRange(0, self._slider_width)
         slider.setValue(x_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
@@ -117,64 +210,66 @@ class MainWindow(QtWidgets.QMainWindow):
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
-        self.slider_xvalue = QtWidgets.QLabel()
-        self.slider_xvalue.setMinimumSize(br.width(), br.height())
-        sliderLayout.addWidget(self.slider_xvalue)
+        self._slider_xvalue = QtWidgets.QLabel()
+        self._slider_xvalue.setMinimumSize(br.width(), br.height())
+        sliderLayout.addWidget(self._slider_xvalue)
         sliderLayout.addWidget(slider)
         layout.addLayout(sliderLayout)
-
-        self.DeltaXSlot(deltax_initial_slider_value)
-        self.XSlot(x_initial_slider_value)
 
         # Create a placeholder widget to hold our toolbar and canvas.
         widget = QtWidgets.QWidget()
         widget.setLayout(layout)
         self.setCentralWidget(widget)
         self.resize(INITIAL_WIDTH, INITIAL_HEIGHT)
-        self.show()
 
-    def show_x_and_deltax(self, ax):
-        x0 = self.x
-        y0 = self.f(x0)
-        # ax.plot([x0], [y0], color='red', marker='o')
-        x1 = self.x + self.deltax
-        y1 = self.f(x1)
-        # ax.plot([x1], [y1], color='red', marker='o')
+        self.DeltaXSlot(deltax_initial_slider_value)
+        self.XSlot(x_initial_slider_value)
+
+    def ShowJustX(self, ax, func):
+        x = self._x
+        y = func.f(x)
+        ax.plot([x], [y], color='red', marker='o')
+
+    def ShowXPlusDeltaX(self, ax, func):
+        x0 = self._x
+        y0 = func.f(x0)
+        x1 = self._x + self._deltax
+        y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
-    def show_x_balanced(self, ax):
-        x = self.x
-        y = self.f(x)
+    def ShowXMinusDeltaX(self, ax, func):
+        x0 = self._x
+        y0 = func.f(x0)
+        x1 = self._x - self._deltax
+        y1 = func.f(x1)
+        ax.plot([x0, x1], [y0, y1], color='red', marker='o')
+
+    def ShowXBalanced(self, ax, func):
+        x = self._x
+        y = func.f(x)
         ax.plot([x], [y], color='blue', marker='o')
-        half = self.deltax / 2.0
+        half = self._deltax / 2.0
         x0 = x - half
-        y0 = self.f(x0)
+        y0 = func.f(x0)
         x1 = x + half
-        y1 = self.f(x1)
+        y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
     def DeltaXSlot(self, value):
-        self.deltax = self.deltax_scale * value
-        if abs(self.deltax) < self.min_deltax:
-            self.deltax = self.min_deltax
-        self.UpdateDerivativeCanvas()
-        self.UpdateMainCanvas()
+        self._deltax = self._deltax_scale * value
+        if abs(self._deltax) < self._min_deltax:
+            self._deltax = self._min_deltax
+        for f in self._update_deltax:
+            f()
+        self._slider_value.setText(self._deltax_format % self._deltax)
         self.show()
-
-    def UpdateDerivativeCanvas(self):
-        self.derivative_canvas.Update()
-        # should set a fixed width font and set width
-        self.slider_value.setText(self.deltax_format % self.deltax)
 
     def XSlot(self, value):
-        self.x = self.xbase + value * self.xscale
-        self.UpdateMainCanvas()
+        self._x = self._xbase + value * self._xscale
+        for f in self._update_x:
+            f()
+        self._slider_xvalue.setText(self._x_format % self._x)
         self.show()
-
-    def UpdateMainCanvas(self):
-        self.main_func_canvas.Update(self.show_x)
-        # should set a fixed width font and set width
-        self.slider_xvalue.setText(self.x_format % self.x)
 
 def Main(argv):
     parser = argparse.ArgumentParser()
@@ -188,10 +283,16 @@ def Main(argv):
                         help='mininum x value to use in plot')
     parser.add_argument('--max-x', '-M', type=float, default= 2.0 * math.pi,
                         help='maximum x value to use in plot')
-    parser.add_argument('--num-segments', '-n', type=int, default=100,
+    parser.add_argument('--num-segments', '-n', type=int, default=1024,
                         help='number of line segments used in graphing functions') 
+    parser.add_argument('--differentiate', '-D', type=int, default=1,
+                        help='number of times to differentiate')
     global options
     options, extra = parser.parse_known_args(argv[1:])
+    if options.differentiate < 1:
+        sys.stderr.write('%s: -D should be at least 1 (%d given)\n' %
+                         (argv[0], options.differentiate))
+        sys.exit(1)
     qtargv = [argv[0]] + extra
     app = QtWidgets.QApplication(qtargv)  # allow for --style, --reverse etc
     fname = options.function_name
