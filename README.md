@@ -15,6 +15,11 @@ evaluated as python code.  The default function is `math.sin`.  There
 is help for the rest of the argument, so try `./visualize.py --help`
 and experiment!
 
+By default, the numerical derivative is computed by using the slope
+between the points (x, f(x)), and (x+Δx, f(x+Δx)), or the "plus"
+approximation.  The `--approximation-method` switch can be used to
+specify other approximations.
+
 The `-D` flag specifies the number of derivative graphs (minium 1) to
 display.  I wouldn't recommend too many if you want to be able to play
 with the sliders, since it will probably be too slow.

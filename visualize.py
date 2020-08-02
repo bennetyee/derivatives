@@ -136,8 +136,12 @@ class MainWindow(QtWidgets.QMainWindow):
                 return (f(x + half) - f(x - half)) / self._deltax
             return fprime
 
-        deriv = derivative_plus
-        show_x = self.ShowXPlusDeltaX  # derivative_plus
+        methods = {
+            'plus': (derivative_plus, self.ShowXPlusDeltaX),
+            'minus': (derivative_minus, self.ShowXMinusDeltaX),
+            'balanced': (derivative_balanced, self.ShowXBalanced)
+        }
+        deriv, show_x = methods[options.approximation_method]
 
         layout = QtWidgets.QVBoxLayout()
 
@@ -287,6 +291,9 @@ def Main(argv):
                         help='number of line segments used in graphing functions') 
     parser.add_argument('--differentiate', '-D', type=int, default=1,
                         help='number of times to differentiate')
+    parser.add_argument('--approximation-method', '-a', default='plus',
+                        choices=['plus', 'minus', 'balanced'],
+                        help='approximation method for computing numerical differentiation: "plus" means use the slope between (x, f(x)) and (x+Δx, f(x+Δx)); "minus" means use the slope between (x-Δx, f(x-Δx)) and (x, f(x)); "balanced" means use the slope between (x-Δx/2, f(x-Δx/2)) and (x+Δx/2, f(x+Δ/2x)).')
     global options
     options, extra = parser.parse_known_args(argv[1:])
     if options.differentiate < 1:
