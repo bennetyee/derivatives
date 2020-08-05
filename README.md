@@ -1,7 +1,8 @@
 # derivatives
 
 This repository contains a PyQt5 based program to aid in visualizing
-taking limits in obtaining the derivative of a function.
+taking limits in obtaining the derivative of a function.  It is meant
+to supplement [a quick tour of derivatives](https://colab.research.google.com/drive/14mF-kmMBF9N8EIqTpu-XvNlBG25cvqu6?usp=sharing).
 
 The program `visualize.py` puts up two graphs, one for f(x) and the
 other for f'(x) over a range x0 to x1.  The function f and the range
