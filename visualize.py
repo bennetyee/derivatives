@@ -135,12 +135,12 @@ class MainWindow(QtWidgets.QMainWindow):
         self._deltax_scale = (xmax - xmin) / float(self._slider_width)
         self._deltax = (xmax - xmin) / num_segs
         self._min_deltax = (xmax - xmin) / 1.e6
-        deltax_initial_slider_value = self._deltax // self._deltax_scale
+        deltax_initial_slider_value: int = int(self._deltax / self._deltax_scale)
 
         self._x = (xmin + xmax) / 2
         self._xbase = xmin
         self._xscale = (xmax - xmin) / self._slider_width
-        x_initial_slider_value = self._slider_width // 2
+        x_initial_slider_value: int = self._slider_width // 2
 
         self._update_x = []
         self._update_deltax = []
@@ -213,7 +213,7 @@ class MainWindow(QtWidgets.QMainWindow):
         slider = QtWidgets.QSlider() # deltax value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setRange(0, self._slider_width)
-        slider.setValue(int(deltax_initial_slider_value))
+        slider.setValue(deltax_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
         slider.valueChanged.connect(self.DeltaXSlot)
@@ -234,7 +234,7 @@ class MainWindow(QtWidgets.QMainWindow):
         slider = QtWidgets.QSlider()  # x value slider
         slider.setOrientation(QtCore.Qt.Horizontal)
         slider.setRange(0, self._slider_width)
-        slider.setValue(int(x_initial_slider_value))
+        slider.setValue(x_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
         slider.valueChanged.connect(self.XSlot)
@@ -286,7 +286,7 @@ class MainWindow(QtWidgets.QMainWindow):
         y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
-    def DeltaXSlot(self, value: float) -> None:
+    def DeltaXSlot(self, value: int) -> None:
         self._deltax = self._deltax_scale * value
         if abs(self._deltax) < self._min_deltax:
             self._deltax = self._min_deltax
@@ -295,7 +295,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._slider_value.setText(self._deltax_format % self._deltax)
         self.show()
 
-    def XSlot(self, value: float) -> None:
+    def XSlot(self, value: int) -> None:
         self._x = self._xbase + value * self._xscale
         for f in self._update_x:
             f()
