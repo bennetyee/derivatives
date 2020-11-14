@@ -223,7 +223,7 @@ class MainWindow(QtWidgets.QMainWindow):
         self._slider_value = QtWidgets.QLabel()
         font = self._slider_value.font()
         br = QtGui.QFontMetrics(font).boundingRect(self._deltax_format % -8.8888e-88)
-        self._slider_value.setMinimumSize(br.width(), br.height())
+        self._slider_value.setFixedSize(br.width(), br.height())
         # use same for x slider
         sliderLayout.addWidget(self._slider_value)
         sliderLayout.addWidget(slider)
@@ -242,7 +242,7 @@ class MainWindow(QtWidgets.QMainWindow):
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
         self._slider_xvalue = QtWidgets.QLabel()
-        self._slider_xvalue.setMinimumSize(br.width(), br.height())
+        self._slider_xvalue.setFixedSize(br.width(), br.height())
         sliderLayout.addWidget(self._slider_xvalue)
         sliderLayout.addWidget(slider)
         layout.addLayout(sliderLayout)
