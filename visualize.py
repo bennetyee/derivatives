@@ -47,9 +47,9 @@ class PrecomputedFunc(Func):
             self._num_segs = 3 * num_segs
         self._prex: List[float] = []
         self._prey: List[float] = []
-        self.UpdatePrecomputes()
+        self.update_precomputes()
 
-    def UpdatePrecomputes(self) -> None:
+    def update_precomputes(self) -> None:
         prex = []
         prey = []
         dx = self._dx
@@ -95,9 +95,9 @@ class FuncCanvas(FigureCanvasQTAgg):
         self._xmax = xmax
         self._num_segs = num_segs
 
-    def Update(self, extra: Callable[..., None]=None) -> None:
+    def update_canvas(self, extra: Callable[..., None]=None) -> None:
         if options.debug:
-            print("Update(self=%s" % self)
+            print("update_canvas(self=%s" % self)
         dx = (self._xmax - self._xmin) / self._num_segs
         xs = []
         ys = []
@@ -164,9 +164,9 @@ class MainWindow(QtWidgets.QMainWindow):
             return fprime
 
         methods = {
-            'plus': (derivative_plus, self.ShowXPlusDeltaX),
-            'minus': (derivative_minus, self.ShowXMinusDeltaX),
-            'balanced': (derivative_balanced, self.ShowXBalanced)
+            'plus': (derivative_plus, self.show_x_plus_delta_x),
+            'minus': (derivative_minus, self.show_x_minus_delta_x),
+            'balanced': (derivative_balanced, self.show_x_balanced)
         }
         deriv, show_x = methods[options.approximation_method]
 
@@ -196,15 +196,15 @@ class MainWindow(QtWidgets.QMainWindow):
             # let it lambda bind to the variable which will change later.
             def ShowXAndDeltaXUpdater(canvas: FigureCanvasQTAgg) -> Callable[[], None]:
                 def Updater():
-                    canvas.Update(show_x)
+                    canvas.update_canvas(show_x)
                 return Updater
             def ShowXUpdater(canvas: FigureCanvasQTAgg) -> Callable[[], None]:
                 def Updater():
-                    canvas.Update(self.ShowJustX)
+                    canvas.update_canvas(self.show_just_x)
                 return Updater
             self._update_x.append(ShowXAndDeltaXUpdater(prev_canvas))
             self._update_deltax.append(ShowXAndDeltaXUpdater(prev_canvas))
-            self._update_deltax.append(fobj.UpdatePrecomputes)
+            self._update_deltax.append(fobj.update_precomputes)
 
             prev_canvas = new_canvas
         self._update_x.append(ShowXUpdater(new_canvas))
@@ -216,7 +216,7 @@ class MainWindow(QtWidgets.QMainWindow):
         slider.setValue(deltax_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
-        slider.valueChanged.connect(self.DeltaXSlot)
+        slider.valueChanged.connect(self.delta_x_slot)
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
@@ -237,7 +237,7 @@ class MainWindow(QtWidgets.QMainWindow):
         slider.setValue(x_initial_slider_value)
         slider.setTickInterval(1)
         slider.setSingleStep(1)
-        slider.valueChanged.connect(self.XSlot)
+        slider.valueChanged.connect(self.x_slot)
 
         sliderLayout = QtWidgets.QHBoxLayout()
         # should set a fixed width font and set width
@@ -253,29 +253,29 @@ class MainWindow(QtWidgets.QMainWindow):
         self.setCentralWidget(widget)
         self.resize(INITIAL_WIDTH, INITIAL_HEIGHT)
 
-        self.DeltaXSlot(deltax_initial_slider_value)
-        self.XSlot(x_initial_slider_value)
+        self.delta_x_slot(deltax_initial_slider_value)
+        self.x_slot(x_initial_slider_value)
 
-    def ShowJustX(self, ax: matplotlib.axes.Axes, func: Func) -> None:
+    def show_just_x(self, ax: matplotlib.axes.Axes, func: Func) -> None:
         x = self._x
         y = func.f(x)
         ax.plot([x], [y], color='red', marker='o')
 
-    def ShowXPlusDeltaX(self, ax: matplotlib.axes.Axes, func: Func) -> None:
+    def show_x_plus_delta_x(self, ax: matplotlib.axes.Axes, func: Func) -> None:
         x0 = self._x
         y0 = func.f(x0)
         x1 = self._x + self._deltax
         y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
-    def ShowXMinusDeltaX(self, ax: matplotlib.axes.Axes, func: Func) -> None:
+    def show_x_minus_delta_x(self, ax: matplotlib.axes.Axes, func: Func) -> None:
         x0 = self._x
         y0 = func.f(x0)
         x1 = self._x - self._deltax
         y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
-    def ShowXBalanced(self, ax: matplotlib.axes.Axes, func: Func) -> None:
+    def show_x_balanced(self, ax: matplotlib.axes.Axes, func: Func) -> None:
         x = self._x
         y = func.f(x)
         ax.plot([x], [y], color='blue', marker='o')
@@ -286,7 +286,7 @@ class MainWindow(QtWidgets.QMainWindow):
         y1 = func.f(x1)
         ax.plot([x0, x1], [y0, y1], color='red', marker='o')
 
-    def DeltaXSlot(self, value: int) -> None:
+    def delta_x_slot(self, value: int) -> None:
         self._deltax = self._deltax_scale * value
         if abs(self._deltax) < self._min_deltax:
             self._deltax = self._min_deltax
@@ -295,14 +295,14 @@ class MainWindow(QtWidgets.QMainWindow):
         self._slider_value.setText(self._deltax_format % self._deltax)
         self.show()
 
-    def XSlot(self, value: int) -> None:
+    def x_slot(self, value: int) -> None:
         self._x = self._xbase + value * self._xscale
         for f in self._update_x:
             f()
         self._slider_xvalue.setText(self._x_format % self._x)
         self.show()
 
-def Main(argv: List[str]) -> None:
+def main(argv: List[str]) -> None:
     parser = argparse.ArgumentParser()
     parser.add_argument('--debug', '-d', action='store_true',
                         help='generate debugging output')
@@ -337,4 +337,4 @@ def Main(argv: List[str]) -> None:
     app.exec_()
 
 if __name__ == '__main__':
-    Main(sys.argv)
+    main(sys.argv)
